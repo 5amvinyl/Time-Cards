@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Shop Time Clock</title>
+<style>
+  :root {
+    --bg: #14151a;
+    --panel: #1d1f26;
+    --panel-border: #2c2f3a;
+    --accent: #ff6a1a;
+    --accent-dim: #c4530f;
+    --text: #f2f1ec;
+    --text-dim: #9a9ca6;
+    --good: #3ddc84;
+    --bad: #ff5a5a;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 28px 24px 24px;
+  }
+
+  .shop-name {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-size: 20px;
+    text-align: center;
+    margin: 0 0 24px;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  select {
+    width: 100%;
+    padding: 14px;
+    background: #0f1014;
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 16px;
+    margin-bottom: 18px;
+  }
+
+  .status-box {
+    text-align: center;
+    padding: 16px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+    font-size: 14px;
+    background: #15171d;
+    border: 1px solid var(--panel-border);
+    color: var(--text-dim);
+    min-height: 20px;
+  }
+
+  .status-box.in { border-color: var(--good); color: var(--good); }
+  .status-box.out { border-color: var(--text-dim); }
+
+  button {
+    width: 100%;
+    padding: 18px;
+    border: none;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+
+  button:active { transform: scale(0.98); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-in {
+    background: var(--good);
+    color: #08130c;
+    margin-bottom: 10px;
+  }
+
+  .btn-out {
+    background: var(--bad);
+    color: #1a0606;
+    margin-bottom: 10px;
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text-dim);
+    font-size: 14px;
+    padding: 12px;
+    font-weight: 500;
+  }
+
+  .message {
+    text-align: center;
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    display: none;
+  }
+
+  .message.success { display: block; background: rgba(61, 220, 132, 0.12); color: var(--good); }
+  .message.error { display: block; background: rgba(255, 90, 90, 0.12); color: var(--bad); }
+  .message.loading { display: block; background: rgba(154, 156, 166, 0.12); color: var(--text-dim); }
+
+  .history {
+    margin-top: 20px;
+    display: none;
+  }
+
+  .history table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .history th, .history td {
+    text-align: left;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--panel-border);
+    color: var(--text-dim);
+  }
+
+  .history th { color: var(--text); font-weight: 600; }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--panel-border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="shop-name">5 A.M. Vinyl</div>
+  <h1>Employee Time Clock</h1>
+
+  <label for="employee">Who are you?</label>
+  <select id="employee" disabled>
+    <option value="">Loading employee list…</option>
+  </select>
+
+  <div class="status-box" id="statusBox">Select your name to see your status.</div>
+
+  <button class="btn-in" id="clockInBtn" disabled>Clock In</button>
+  <button class="btn-out" id="clockOutBtn" disabled>Clock Out</button>
+  <button class="btn-secondary" id="historyBtn" disabled>View My Recent Hours</button>
+
+  <div class="message" id="message"></div>
+
+  <div class="history" id="historyBox">
+    <table>
+      <thead>
+        <tr><th>Date</th><th>In</th><th>Out</th><th>Hrs</th></tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // ===================================================================
+  // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW, between the quotes.
+  // You get this URL after deploying Code.gs (see setup guide, step 6).
+  // ===================================================================
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyW7yv-ok88AOFy4017Q5L0DIN_D1QC3ZjrjBUxW6ZwolOVSuucfNl_HXT9yssDmzeJ/exec";
+
+  const employeeSelect = document.getElementById('employee');
+  const statusBox = document.getElementById('statusBox');
+  const clockInBtn = document.getElementById('clockInBtn');
+  const clockOutBtn = document.getElementById('clockOutBtn');
+  const historyBtn = document.getElementById('historyBtn');
+  const messageBox = document.getElementById('message');
+  const historyBox = document.getElementById('historyBox');
+  const historyBody = document.getElementById('historyBody');
+
+  let currentlyClockedIn = false;
+
+  // Load the employee list fresh from the Sheet's "Manage Employees" tab
+  // every time the page opens, so adding/removing someone there shows
+  // up here automatically with no code changes.
+  loadEmployees();
+
+  async function loadEmployees() {
+    employeeSelect.innerHTML = '<option value="">Loading employee list…</option>';
+    try {
+      const res = await callScript({ action: 'getEmployees' });
+      if (res.success && res.employees.length > 0) {
+        employeeSelect.innerHTML = '<option value="">Select your name…</option>' +
+          res.employees.map(name => `<option value="${name}">${name}</option>`).join('');
+        employeeSelect.disabled = false;
+      } else {
+        employeeSelect.innerHTML = '<option value="">No employees found</option>';
+        statusBox.textContent = 'No active employees are set up yet. Check the Manage Employees tab in the Sheet.';
+      }
+    } catch (err) {
+      employeeSelect.innerHTML = '<option value="">Could not load employee list</option>';
+      statusBox.textContent = 'Could not reach the time clock. Check your connection and reload this page.';
+    }
+  }
+
+  employeeSelect.addEventListener('change', async () => {
+    const name = employeeSelect.value;
+    historyBox.style.display = 'none';
+    messageBox.className = 'message';
+    if (!name) {
+      statusBox.className = 'status-box';
+      statusBox.textContent = 'Select your name to see your status.';
+      clockInBtn.disabled = true;
+      clockOutBtn.disabled = true;
+      historyBtn.disabled = true;
+      return;
+    }
+    clockInBtn.disabled = true;
+    clockOutBtn.disabled = true;
+    historyBtn.disabled = false;
+    statusBox.className = 'status-box';
+    statusBox.innerHTML = '<span class="spinner"></span>Checking status…';
+
+    try {
+      const res = await callScript({ action: 'getStatus', employee: name });
+      currentlyClockedIn = res.clockedIn;
+      updateStatusDisplay();
+    } catch (err) {
+      statusBox.className = 'status-box';
+      statusBox.textContent = 'Could not check status. You can still try clocking in.';
+      clockInBtn.disabled = false;
+      clockOutBtn.disabled = false;
+    }
+  });
+
+  function updateStatusDisplay() {
+    if (currentlyClockedIn) {
+      statusBox.className = 'status-box in';
+      statusBox.textContent = 'You are currently clocked in.';
+      clockInBtn.disabled = true;
+      clockOutBtn.disabled = false;
+    } else {
+      statusBox.className = 'status-box out';
+      statusBox.textContent = 'You are currently clocked out.';
+      clockInBtn.disabled = false;
+      clockOutBtn.disabled = true;
+    }
+  }
+
+  clockInBtn.addEventListener('click', () => doPunch('clockIn'));
+  clockOutBtn.addEventListener('click', () => doPunch('clockOut'));
+
+  async function doPunch(action) {
+    const name = employeeSelect.value;
+    if (!name) return;
+
+    clockInBtn.disabled = true;
+    clockOutBtn.disabled = true;
+    messageBox.className = 'message loading';
+    messageBox.innerHTML = '<span class="spinner"></span>Getting your location…';
+
+    if (!navigator.geolocation) {
+      showMessage('error', 'Your browser does not support location services. Try a different browser.');
+      updateStatusDisplay();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        messageBox.innerHTML = '<span class="spinner"></span>Sending…';
+        try {
+          const res = await callScript({
+            action: action,
+            employee: name,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          });
+          if (res.success) {
+            showMessage('success', res.message);
+            currentlyClockedIn = (action === 'clockIn');
+          } else {
+            showMessage('error', res.error);
+          }
+        } catch (err) {
+          showMessage('error', 'Could not reach the time clock. Check your internet connection and try again.');
+        }
+        updateStatusDisplay();
+      },
+      (error) => {
+        let msg = 'Could not get your location. ';
+        if (error.code === error.PERMISSION_DENIED) {
+          msg += 'Please allow location access for this page in your phone settings, then try again.';
+        } else {
+          msg += 'Make sure location services are turned on and try again.';
+        }
+        showMessage('error', msg);
+        updateStatusDisplay();
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+
+  historyBtn.addEventListener('click', async () => {
+    const name = employeeSelect.value;
+    if (!name) return;
+    historyBtn.disabled = true;
+    historyBtn.textContent = 'Loading…';
+    try {
+      const res = await callScript({ action: 'getHistory', employee: name });
+      historyBody.innerHTML = '';
+      if (res.entries.length === 0) {
+        historyBody.innerHTML = '<tr><td colspan="4">No punches yet.</td></tr>';
+      } else {
+        res.entries.forEach(e => {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td>${e.date}</td><td>${e.timeIn}</td><td>${e.timeOut}</td><td>${e.hours}</td>`;
+          historyBody.appendChild(row);
+        });
+      }
+      historyBox.style.display = 'block';
+    } catch (err) {
+      showMessage('error', 'Could not load history.');
+    }
+    historyBtn.disabled = false;
+    historyBtn.textContent = 'View My Recent Hours';
+  });
+
+  function showMessage(type, text) {
+    messageBox.className = 'message ' + type;
+    messageBox.textContent = text;
+  }
+
+  async function callScript(payload) {
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  }
+</script>
+
+</body>
+</html>
