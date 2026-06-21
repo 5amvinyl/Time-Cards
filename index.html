@@ -77,6 +77,51 @@
     margin-bottom: 18px;
   }
 
+  .pin-row {
+    display: none;
+    margin-bottom: 18px;
+  }
+
+  .pin-row input {
+    width: 100%;
+    padding: 14px;
+    background: #0f1014;
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 20px;
+    letter-spacing: 0.3em;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .pin-row input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .pin-row button {
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  .pin-error {
+    color: var(--bad);
+    font-size: 13px;
+    text-align: center;
+    margin-top: -2px;
+    margin-bottom: 10px;
+    display: none;
+  }
+
+  .unlocked-badge {
+    display: none;
+    text-align: center;
+    font-size: 13px;
+    color: var(--good);
+    margin-bottom: 18px;
+  }
+
   .status-box {
     text-align: center;
     padding: 16px;
@@ -187,6 +232,14 @@
     <option value="">Loading employee list…</option>
   </select>
 
+  <div class="pin-row" id="pinRow">
+    <input type="password" id="pinInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Enter your 4-digit PIN">
+    <div class="pin-error" id="pinError">Incorrect PIN. Try again.</div>
+    <button class="btn-secondary" id="pinSubmitBtn" style="background: var(--accent); color: #1a0a02; border: none;">Unlock</button>
+  </div>
+
+  <div class="unlocked-badge" id="unlockedBadge">✓ Verified for this session</div>
+
   <div class="status-box" id="statusBox">Select your name to see your status.</div>
 
   <button class="btn-in" id="clockInBtn" disabled>Clock In</button>
@@ -210,7 +263,7 @@
   // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW, between the quotes.
   // You get this URL after deploying Code.gs (see setup guide, step 6).
   // ===================================================================
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyW7yv-ok88AOFy4017Q5L0DIN_D1QC3ZjrjBUxW6ZwolOVSuucfNl_HXT9yssDmzeJ/exec";
+  const SCRIPT_URL = "YOUR_SCRIPT_URL_HERE";
 
   const employeeSelect = document.getElementById('employee');
   const statusBox = document.getElementById('statusBox');
@@ -220,8 +273,22 @@
   const messageBox = document.getElementById('message');
   const historyBox = document.getElementById('historyBox');
   const historyBody = document.getElementById('historyBody');
+  const pinRow = document.getElementById('pinRow');
+  const pinInput = document.getElementById('pinInput');
+  const pinError = document.getElementById('pinError');
+  const pinSubmitBtn = document.getElementById('pinSubmitBtn');
+  const unlockedBadge = document.getElementById('unlockedBadge');
 
   let currentlyClockedIn = false;
+
+  // Names verified with a correct PIN during this browser session.
+  // Cleared automatically when the tab/browser closes, since this is
+  // just a JS variable in memory, nothing is written to disk.
+  const unlockedNames = new Set();
+  // Holds each unlocked name's PIN in memory for this session only,
+  // so it can be resent with each punch for the backend's own check,
+  // without asking the employee to re-type it every time.
+  const sessionPins = {};
 
   // Load the employee list fresh from the Sheet's "Manage Employees" tab
   // every time the page opens, so adding/removing someone there shows
@@ -250,16 +317,76 @@
     const name = employeeSelect.value;
     historyBox.style.display = 'none';
     messageBox.className = 'message';
+    pinError.style.display = 'none';
+    pinInput.value = '';
+
     if (!name) {
       statusBox.className = 'status-box';
       statusBox.textContent = 'Select your name to see your status.';
       clockInBtn.disabled = true;
       clockOutBtn.disabled = true;
       historyBtn.disabled = true;
+      pinRow.style.display = 'none';
+      unlockedBadge.style.display = 'none';
       return;
     }
-    clockInBtn.disabled = true;
-    clockOutBtn.disabled = true;
+
+    if (unlockedNames.has(name)) {
+      pinRow.style.display = 'none';
+      unlockedBadge.style.display = 'block';
+      await loadStatusFor(name);
+    } else {
+      pinRow.style.display = 'block';
+      unlockedBadge.style.display = 'none';
+      statusBox.className = 'status-box';
+      statusBox.textContent = 'Enter your PIN to continue.';
+      clockInBtn.disabled = true;
+      clockOutBtn.disabled = true;
+      historyBtn.disabled = true;
+      pinInput.focus();
+    }
+  });
+
+  pinSubmitBtn.addEventListener('click', submitPin);
+  pinInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitPin();
+  });
+
+  async function submitPin() {
+    const name = employeeSelect.value;
+    const pin = pinInput.value.trim();
+    if (!name || pin.length !== 4) {
+      pinError.textContent = 'Enter your 4-digit PIN.';
+      pinError.style.display = 'block';
+      return;
+    }
+    pinSubmitBtn.disabled = true;
+    pinSubmitBtn.textContent = 'Checking…';
+    pinError.style.display = 'none';
+
+    try {
+      const res = await callScript({ action: 'verifyPin', employee: name, pin: pin });
+      if (res.success) {
+        unlockedNames.add(name);
+        sessionPins[name] = pin;
+        pinRow.style.display = 'none';
+        unlockedBadge.style.display = 'block';
+        await loadStatusFor(name);
+      } else {
+        pinError.textContent = res.error || 'Incorrect PIN.';
+        pinError.style.display = 'block';
+        pinInput.value = '';
+        pinInput.focus();
+      }
+    } catch (err) {
+      pinError.textContent = 'Could not verify PIN. Check your connection and try again.';
+      pinError.style.display = 'block';
+    }
+    pinSubmitBtn.disabled = false;
+    pinSubmitBtn.textContent = 'Unlock';
+  }
+
+  async function loadStatusFor(name) {
     historyBtn.disabled = false;
     statusBox.className = 'status-box';
     statusBox.innerHTML = '<span class="spinner"></span>Checking status…';
@@ -274,7 +401,7 @@
       clockInBtn.disabled = false;
       clockOutBtn.disabled = false;
     }
-  });
+  }
 
   function updateStatusDisplay() {
     if (currentlyClockedIn) {
@@ -295,7 +422,7 @@
 
   async function doPunch(action) {
     const name = employeeSelect.value;
-    if (!name) return;
+    if (!name || !unlockedNames.has(name)) return;
 
     clockInBtn.disabled = true;
     clockOutBtn.disabled = true;
@@ -315,6 +442,7 @@
           const res = await callScript({
             action: action,
             employee: name,
+            pin: sessionPins[name],
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy
@@ -346,7 +474,7 @@
 
   historyBtn.addEventListener('click', async () => {
     const name = employeeSelect.value;
-    if (!name) return;
+    if (!name || !unlockedNames.has(name)) return;
     historyBtn.disabled = true;
     historyBtn.textContent = 'Loading…';
     try {
